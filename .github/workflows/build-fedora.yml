@@ -1,13 +1,12 @@
-name: 在 Fedora 44 容器里编译 .AppImage（v3.8.3 分支专用）
+name: 在 ubuntu-24.04 容器里编译 .AppImage（v3.8.3 分支专用）
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container:
-      image: fedora:44
+    # ubuntu-latest 默认装好 fuse 和 unsquashfs，能直接跑 AppImage
+    runs-on: ubuntu-24.04
 
     steps:
       - name: 拉取代码（v3.8.3 分支）
@@ -15,42 +14,28 @@ jobs:
         with:
           ref: v3.8.3
 
-      - name: 安装编译依赖 + squashfs 工具
+      - name: 安装编译依赖 + AppImage 工具
         run: |
-          dnf install -y --setopt=install_weak_deps=False \
-            cmake ninja-build gcc-c++ make \
-            qt5-qtbase-devel \
-            qt5-qtsvg-devel \
-            qt5-qtxmlpatterns-devel \
-            fuse \
-            squashfs-tools \
-            curl \
-            file
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ make \
+            qtbase5-dev qttools5-dev-tools libqt5printsupport5-dev libqt5xmlpatterns5-dev \
+            libfuse2 squashfs-tools \
+            curl file zsync
 
-      - name: 下载并解压 linuxdeploy 工具链
+      - name: 拉取 linuxdeploy 工具链
         run: |
           cd /tmp
-          # linuxdeploy 主程序
           curl -L -o linuxdeploy-x86_64.AppImage \
             https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          # qt 插件（用于收集 Qt 库）
           curl -L -o linuxdeploy-plugin-qt-x86_64.AppImage \
             https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           
-          # AppImage 本身就是 squashfs 镜像，用 unsquashfs 解压
-          mkdir -p /opt/linuxdeploy
-          unsquashfs -d /opt/linuxdeploy -f linuxdeploy-x86_64.AppImage
-          unsquashfs -d /opt/linuxdeploy-qt-plugin -f linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
           
-          # 把 qt 插件的可执行文件合并到 linuxdeploy 同目录
-          cp -r /opt/linuxdeploy-qt-plugin/usr/* /opt/linuxdeploy/usr/
-          
-          # 软链接到 PATH
-          ln -sf /opt/linuxdeploy/usr/bin/linuxdeploy /usr/local/bin/linuxdeploy
-          ln -sf /opt/linuxdeploy/usr/bin/linuxdeploy-plugin-qt /usr/local/bin/linuxdeploy-plugin-qt
-          
-          linuxdeploy --version
-          linuxdeploy-plugin-qt --version
+          # 测试：ubuntu-24.04 的 fuse2 让 AppImage 直接可执行
+          ./linuxdeploy-x86_64.AppImage --version
+          ./linuxdeploy-plugin-qt-x86_64.AppImage --version
 
       - name: 配置 cmake
         run: |
@@ -80,11 +65,15 @@ jobs:
       - name: 用 linuxdeploy 生成 AppImage
         env:
           QT_SELECT: qt5
+          LINUXDEPLOY_PLUGIN_QT_VERSION: 5
         run: |
           cd AppDir
           export QML_SOURCES_PATHS=$(pwd)
           
-          linuxdeploy \
+          # 在 PATH 里能找到 linuxdeploy-plugin-qt
+          export PATH="/tmp:$PATH"
+          
+          /tmp/linuxdeploy-x86_64.AppImage \
             --appdir . \
             --executable usr/bin/NotePad-- \
             --desktop-file usr/share/applications/NotePad--.desktop \
