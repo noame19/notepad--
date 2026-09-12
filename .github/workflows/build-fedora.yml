@@ -5,7 +5,6 @@ on:
 
 jobs:
   build:
-    # ubuntu-latest 默认装好 fuse 和 unsquashfs，能直接跑 AppImage
     runs-on: ubuntu-24.04
 
     steps:
@@ -19,7 +18,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build g++ make \
-            qtbase5-dev qttools5-dev-tools libqt5printsupport5-dev libqt5xmlpatterns5-dev \
+            qtbase5-dev \
+            qttools5-dev-tools \
+            libqt5xmlpatterns5-dev \
             libfuse2 squashfs-tools \
             curl file zsync
 
@@ -30,12 +31,9 @@ jobs:
             https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           curl -L -o linuxdeploy-plugin-qt-x86_64.AppImage \
             https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-          
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
-          
-          # 测试：ubuntu-24.04 的 fuse2 让 AppImage 直接可执行
-          ./linuxdeploy-x86_64.AppImage --version
-          ./linuxdeploy-plugin-qt-x86_64.AppImage --version
+          /tmp/linuxdeploy-x86_64.AppImage --version
+          /tmp/linuxdeploy-plugin-qt-x86_64.AppImage --version
 
       - name: 配置 cmake
         run: |
@@ -69,8 +67,6 @@ jobs:
         run: |
           cd AppDir
           export QML_SOURCES_PATHS=$(pwd)
-          
-          # 在 PATH 里能找到 linuxdeploy-plugin-qt
           export PATH="/tmp:$PATH"
           
           /tmp/linuxdeploy-x86_64.AppImage \
@@ -81,7 +77,6 @@ jobs:
             --plugin qt \
             --output appimage
           
-          echo "---生成的 AppImage---"
           ls -lh *.AppImage
 
       - name: 上传 AppImage 产物
