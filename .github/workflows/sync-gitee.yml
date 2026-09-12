@@ -7,7 +7,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # 允许 push 到自己 fork 的分支
+      contents: write
 
     steps:
       - name: 从 gitee 拉取 v3.8.3 源码
@@ -17,9 +17,10 @@ jobs:
           git checkout 91105f68b7
 
       - name: 推送到 fork 的 v3.8.3 分支
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd gitee-src
           git config user.email "sync-bot@users.noreply.github.com"
           git config user.name "gitee-sync"
-          git remote add fork https://x-access-token:${GITHUB_TOKEN}@github.com/noame19/notepad--.git
-          git push fork HEAD:refs/heads/v3.8.3 --force
+          git push https://x-access-token:${GH_TOKEN}@github.com/noame19/notepad--.git HEAD:refs/heads/v3.8.3 --force
