@@ -1,6 +1,5 @@
 name: 在 Fedora 44 容器里编译 .AppImage（v3.8.3 分支专用）
 
-# 手动触发：在 Actions 页 → Run workflow
 on:
   workflow_dispatch:
 
@@ -16,7 +15,7 @@ jobs:
         with:
           ref: v3.8.3
 
-      - name: 安装编译 + AppImage 打包工具
+      - name: 安装编译依赖（编译工具链 + Qt5 + fuse）
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             cmake ninja-build gcc-c++ make \
@@ -24,11 +23,38 @@ jobs:
             qt5-qtsvg-devel \
             qt5-qtxmlpatterns-devel \
             fuse \
-            linuxdeploy \
-            linuxdeploy-plugin-qt \
-            wget
+            curl \
+            zsync
 
-      - name: 配置 cmake（不指定 CPACK_GENERATOR，避免 RPM 元数据干扰）
+      - name: 下载 linuxdeploy 工具链（GitHub release 直接拿二进制）
+        run: |
+          cd /tmp
+          curl -L -o linuxdeploy-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -L -o linuxdeploy-plugin-qt-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          
+          # AppImage 在容器里要 --appimage-extract-and-run 跑
+          mkdir -p /opt/linuxdeploy/bin
+          ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run --help > /dev/null 2>&1 || true
+          # 用 squashfs-root 里的可执行
+          if [ -d squashfs-root ]; then
+            cp -r squashfs-root/* /opt/linuxdeploy/
+          fi
+          ln -sf /opt/linuxdeploy/usr/bin/linuxdeploy /usr/local/bin/linuxdeploy
+          
+          ./linuxdeploy-plugin-qt-x86_64.AppImage --appimage-extract-and-run --help > /dev/null 2>&1 || true
+          if [ -d squashfs-root ]; then
+            cp -r squashfs-root/usr/* /opt/linuxdeploy/usr/ 2>/dev/null || true
+          fi
+          ln -sf /opt/linuxdeploy/usr/bin/linuxdeploy-plugin-qt /usr/local/bin/linuxdeploy-plugin-qt
+          
+          which linuxdeploy
+          linuxdeploy --version
+
+      - name: 配置 cmake
         run: |
           mkdir -p build && cd build
           cmake -S ../how_build -B . -G Ninja \
@@ -39,36 +65,26 @@ jobs:
           cd build
           cmake --build . --parallel
 
-      - name: 准备 AppDir 目录结构
+      - name: 准备 AppDir
         run: |
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/128x128/apps
           mkdir -p AppDir/usr/share/metainfo
           
-          # 主二进制
           cp build/NotePad-- AppDir/usr/bin/NotePad--
           chmod +x AppDir/usr/bin/NotePad--
           
-          # desktop / 图标 / metainfo（来自 src/linux/usr/，作者准备的发布资源）
           cp -r src/linux/usr/share/applications/* AppDir/usr/share/applications/
           cp -r src/linux/usr/share/icons/hicolor/128x128/apps/* AppDir/usr/share/icons/hicolor/128x128/apps/
           cp -r src/linux/usr/share/metainfo/* AppDir/usr/share/metainfo/ 2>/dev/null || true
-          
-          # 资源文件（qrc 嵌入的可选数据）
-          cp -r src/Resources AppDir/usr/share/ 2>/dev/null || true
-          
-          # 让 linuxdeploy 找到图标（squashfs 入口要求）
-          ls -la AppDir/usr/share/icons/hicolor/128x128/apps/
 
-      - name: 用 linuxdeploy + qt 插件生成 AppImage
+      - name: 用 linuxdeploy 生成 AppImage
         env:
-          # 让 linuxdeploy-plugin-qt 知道去 Qt5 找库
           QT_SELECT: qt5
         run: |
           cd AppDir
           export QML_SOURCES_PATHS=$(pwd)
-          export LINUXDEPLOY_PLUGIN_QT_VERSION=5
           
           linuxdeploy \
             --appdir . \
