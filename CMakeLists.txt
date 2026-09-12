@@ -68,7 +68,12 @@ if(CMAKE_HOST_UNIX)
     install(DIRECTORY  ${PROJECT_SOURCE_DIR}/src/linux/usr
             DESTINATION "/")
 
-    include(${PROJECT_SOURCE_DIR}/cmake/deb_package_config.cmake) 
+    # 根据打包格式选择对应的 cmake 配置：RPM 或 DEB（默认 DEB）
+    if(DEFINED CPACK_GENERATOR AND CPACK_GENERATOR STREQUAL "RPM")
+        include(${PROJECT_SOURCE_DIR}/cmake/rpm_package_config.cmake)
+    else()
+        include(${PROJECT_SOURCE_DIR}/cmake/deb_package_config.cmake)
+    endif()
     include(CPack)
 elseif(CMAKE_HOST_WIN32)
     install(TARGETS ${PROJECT_NAME}
