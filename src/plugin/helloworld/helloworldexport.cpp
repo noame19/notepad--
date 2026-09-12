@@ -45,7 +45,7 @@ bool NDD_PROC_IDENTIFY(NDD_PROC_DATA* pProcData)
 		return false;
 	}
 	pProcData->m_strPlugName = QObject::tr("Hello World Plug");
-	pProcData->m_strComment = QObject::tr(u8"不需要创建二级菜单的插件例子");
+	pProcData->m_strComment = QObject::tr("不需要创建二级菜单的插件例子");
 
 	pProcData->m_version = QString("v1.0");
 	pProcData->m_auther = QString("zuowei.yin");
@@ -113,4 +113,4 @@ void onDllUnload(void)
 {
 	//做全局回收工作
 }
-#endif
+#endif
