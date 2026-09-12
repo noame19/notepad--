@@ -8,11 +8,11 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt5 REQUIRED COMPONENTS Core Gui Widgets Concurrent Network PrintSupport XmlPatterns)
 
 # qscint 关键依赖库
-add_subdirectory(${PROJECT_SOURCE_DIR}/../src/qscint)
+add_subdirectory(${PROJECT_SOURCE_DIR}/../src/qscint ${CMAKE_BINARY_DIR}/qscint)
 
 # 插件库包含
 # helloworld 动态插件库
-add_subdirectory(${PROJECT_SOURCE_DIR}/../src/plugin/helloworld)
+add_subdirectory(${PROJECT_SOURCE_DIR}/../src/plugin/helloworld ${CMAKE_BINARY_DIR}/helloworld)
 
 # win下需要开启UNICODE进行支持TCHAR
 if(CMAKE_HOST_WIN32)
