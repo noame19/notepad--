@@ -18,7 +18,9 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             cmake ninja-build gcc-c++ make \
-            qt5-qtbase-devel qt5-qtsvg-devel \
+            qt5-qtbase-devel \
+            qt5-qtsvg-devel \
+            qt5-qtxmlpatterns-devel \
             rpm-build
 
       - name: 配置 cmake（指定 RPM 打包）
