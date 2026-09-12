@@ -1,5 +1,6 @@
-name: 在 Fedora 44 容器里编译 .rpm 包（v3.8.3 分支专用）
+name: 在 Fedora 44 容器里编译 .AppImage（v3.8.3 分支专用）
 
+# 手动触发：在 Actions 页 → Run workflow
 on:
   workflow_dispatch:
 
@@ -15,35 +16,74 @@ jobs:
         with:
           ref: v3.8.3
 
-      - name: 安装编译依赖（Qt5 开发包 + cmake + ninja + rpm-build）
+      - name: 安装编译 + AppImage 打包工具
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             cmake ninja-build gcc-c++ make \
             qt5-qtbase-devel \
             qt5-qtsvg-devel \
             qt5-qtxmlpatterns-devel \
-            rpm-build
+            fuse \
+            linuxdeploy \
+            linuxdeploy-plugin-qt \
+            wget
 
-      - name: 配置 cmake（指定 RPM 打包，源目录 how_build）
+      - name: 配置 cmake（不指定 CPACK_GENERATOR，避免 RPM 元数据干扰）
         run: |
           mkdir -p build && cd build
           cmake -S ../how_build -B . -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCPACK_GENERATOR=RPM
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: 编译源码
         run: |
           cd build
           cmake --build . --parallel
 
-      - name: 打 RPM 包
+      - name: 准备 AppDir 目录结构
         run: |
-          cd build
-          cpack -G RPM
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/128x128/apps
+          mkdir -p AppDir/usr/share/metainfo
+          
+          # 主二进制
+          cp build/NotePad-- AppDir/usr/bin/NotePad--
+          chmod +x AppDir/usr/bin/NotePad--
+          
+          # desktop / 图标 / metainfo（来自 src/linux/usr/，作者准备的发布资源）
+          cp -r src/linux/usr/share/applications/* AppDir/usr/share/applications/
+          cp -r src/linux/usr/share/icons/hicolor/128x128/apps/* AppDir/usr/share/icons/hicolor/128x128/apps/
+          cp -r src/linux/usr/share/metainfo/* AppDir/usr/share/metainfo/ 2>/dev/null || true
+          
+          # 资源文件（qrc 嵌入的可选数据）
+          cp -r src/Resources AppDir/usr/share/ 2>/dev/null || true
+          
+          # 让 linuxdeploy 找到图标（squashfs 入口要求）
+          ls -la AppDir/usr/share/icons/hicolor/128x128/apps/
 
-      - name: 上传 RPM 产物
+      - name: 用 linuxdeploy + qt 插件生成 AppImage
+        env:
+          # 让 linuxdeploy-plugin-qt 知道去 Qt5 找库
+          QT_SELECT: qt5
+        run: |
+          cd AppDir
+          export QML_SOURCES_PATHS=$(pwd)
+          export LINUXDEPLOY_PLUGIN_QT_VERSION=5
+          
+          linuxdeploy \
+            --appdir . \
+            --executable usr/bin/NotePad-- \
+            --desktop-file usr/share/applications/NotePad--.desktop \
+            --icon-file usr/share/icons/hicolor/128x128/apps/notepad--.png \
+            --plugin qt \
+            --output appimage
+          
+          echo "---生成的 AppImage---"
+          ls -lh *.AppImage
+
+      - name: 上传 AppImage 产物
         uses: actions/upload-artifact@v4
         with:
-          name: notepad-rpm-v3.8.3
-          path: build/*.rpm
+          name: notepad-appimage-v3.8.3
+          path: AppDir/*.AppImage
           if-no-files-found: error
